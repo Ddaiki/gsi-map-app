@@ -24,8 +24,7 @@
   .search-row { display: flex; gap: 6px; }
   #address-input {
     flex: 1; padding: 10px; border: 1px solid #ccc; border-radius: 4px;
-    font-size: 16px; /* iPhoneでズームしないための16px */
-    min-width: 0;
+    font-size: 16px; min-width: 0;
   }
   .button {
     padding: 10px 14px; border: none; background-color: #007bff;
@@ -42,6 +41,14 @@
   .suggestion-item:active { background-color: #e0e0e0; }
   .suggestion-item:hover { background-color: #f0f0f0; }
   #action-buttons { margin-top: 8px; display: flex; flex-wrap: wrap; justify-content: center; }
+
+  /* info-boxを検索ボックス直下に表示 */
+  #info-box {
+    margin-top: 8px;
+    background: rgba(0,0,0,0.7); color: white; padding: 7px 12px;
+    border-radius: 6px; display: none;
+    font-size: 13px; line-height: 1.5; text-align: center;
+  }
 
   /* 現在地ボタン */
   #locate-button {
@@ -65,14 +72,6 @@
   #crosshair::before { top: 50%; left: 6px; right: 6px; height: 3px; margin-top: -1.5px; }
   #crosshair::after { left: 50%; top: 6px; bottom: 6px; width: 3px; margin-left: -1.5px; }
 
-  #info-box {
-    position: absolute; bottom: 20px; left: 50%; transform: translateX(-50%);
-    background: rgba(0,0,0,0.7); color: white; padding: 8px 15px;
-    border-radius: 20px; z-index: 1000; display: none;
-    font-size: 13px; white-space: nowrap; max-width: 90vw;
-    text-align: center; line-height: 1.5;
-  }
-
   #calculator-container {
     position: absolute; bottom: 10px; left: 10px; width: 240px;
     background: white; border-radius: 8px;
@@ -81,9 +80,9 @@
   #calculator-header {
     padding: 10px; background-color: #f7f7f7; border-bottom: 1px solid #eee;
     border-top-left-radius: 8px; border-top-right-radius: 8px;
-    display: flex; justify-content: space-between; align-items: center;
+    display: flex; justify-content: space-between; align-items: center; gap: 6px;
   }
-  #calculator-header h3 { margin: 0; font-size: 16px; }
+  #calculator-header h3 { margin: 0; font-size: 16px; flex: 1; }
   #calculator-list {
     list-style-type: none; padding: 0; margin: 0; max-height: 150px; overflow-y: auto;
   }
@@ -98,13 +97,15 @@
   }
   #roof-calculator div { margin-top: 8px; }
   #roof-area-total { font-weight: bold; color: #007bff; font-size: 14px; }
-  #copy-btn {
-    padding: 4px 10px; font-size: 12px; background: #555; color: white;
-    border: none; border-radius: 4px; cursor: pointer;
-  }
-  #copy-btn:active { background: #333; }
 
-  /* スマホ用：計算パネルを小さい画面でも使えるように */
+  .small-btn {
+    padding: 4px 8px; font-size: 12px; border: none;
+    border-radius: 4px; cursor: pointer; color: white;
+  }
+  .small-btn:active { opacity: 0.7; }
+  #copy-btn { background: #555; }
+  #reset-btn { background: #e74c3c; }
+
   @media (max-width: 400px) {
     #calculator-container { width: calc(100vw - 20px); left: 10px; right: 10px; }
   }
@@ -120,16 +121,18 @@
     </div>
     <div id="suggestions"></div>
     <div id="action-buttons"></div>
+    <!-- info-boxを検索ボックス内の一番下に配置 -->
+    <div id="info-box"></div>
   </div>
 </div>
 
-<!-- 現在地ボタン -->
 <button id="locate-button" title="現在地へ">📍</button>
 
 <div id="calculator-container">
   <div id="calculator-header">
     <h3>面積計算</h3>
-    <button id="copy-btn">コピー</button>
+    <button id="reset-btn" class="small-btn">リセット</button>
+    <button id="copy-btn" class="small-btn">コピー</button>
   </div>
   <ul id="calculator-list"></ul>
   <div id="calculator-footer">Footprint合計: 0 m²</div>
@@ -167,7 +170,6 @@
 </div>
 
 <div id="crosshair"></div>
-<div id="info-box"></div>
 <div id="map"></div>
 
 <script>
@@ -188,6 +190,7 @@
   const roofAreaTotalDiv = document.getElementById('roof-area-total');
   const locateButton = document.getElementById('locate-button');
   const copyBtn = document.getElementById('copy-btn');
+  const resetBtn = document.getElementById('reset-btn');
 
   L.tileLayer('https://cyberjapandata.gsi.go.jp/xyz/seamlessphoto/{z}/{x}/{y}.jpg', {
     attribution: "<a href='https://maps.gsi.go.jp/development/ichiran.html'>地理院タイル</a>|© <a href='https://www.openstreetmap.org/copyright'>OSM</a> contributors",
@@ -223,30 +226,34 @@
     const text = `【屋根面積計算】\n${footprint}\n勾配: ${slope}\n${roof}`;
     if (navigator.clipboard) {
       navigator.clipboard.writeText(text).then(() => {
-        copyBtn.textContent = '✓ コピー済';
+        copyBtn.textContent = '✓';
         setTimeout(() => copyBtn.textContent = 'コピー', 2000);
       });
     } else {
-      // iOS Safari fallback
       const ta = document.createElement('textarea');
       ta.value = text;
       document.body.appendChild(ta);
       ta.select();
       document.execCommand('copy');
       document.body.removeChild(ta);
-      copyBtn.textContent = '✓ コピー済';
+      copyBtn.textContent = '✓';
       setTimeout(() => copyBtn.textContent = 'コピー', 2000);
     }
   });
 
-  // 検索時にキーボードを閉じる
-  searchButton.addEventListener('click', () => {
-    addressInput.blur();
-    handleSearch();
+  // リセットボタン
+  resetBtn.addEventListener('click', () => {
+    // 選択中の輪郭の色を元に戻す
+    if (activeLayer) {
+      activeLayer.eachLayer(layer => {
+        if (layer.setStyle) layer.setStyle({ color: '#3388ff' });
+      });
+    }
+    resetCalculator();
   });
-  addressInput.addEventListener('keypress', e => {
-    if (e.key === 'Enter') { addressInput.blur(); handleSearch(); }
-  });
+
+  searchButton.addEventListener('click', () => { addressInput.blur(); handleSearch(); });
+  addressInput.addEventListener('keypress', e => { if (e.key === 'Enter') { addressInput.blur(); handleSearch(); } });
   slopeRateSelect.addEventListener('change', updateCalculator);
 
   async function fetchWithTimeout(resource, options = {}, timeout = 15000) {
@@ -273,7 +280,7 @@
       multiBtn.onclick = () => handlePolygonFetch(true);
       actionButtonsContainer.appendChild(multiBtn);
     } else if (mode === 'polygon_displayed') {
-      infoBox.textContent = '輪郭が違う場合は再調整できます。\n周辺検索時は輪郭クリックで面積計算できます。';
+      infoBox.textContent = '輪郭が違う場合は再調整できます。周辺検索時は輪郭クリックで面積計算できます。';
       infoBox.style.display = 'block';
       const retryBtn = document.createElement('button');
       retryBtn.className = 'button';
@@ -361,7 +368,10 @@
     updateCalculator();
   }
 
-  function resetCalculator() { selectedLayers = {}; updateCalculator(); }
+  function resetCalculator() {
+    selectedLayers = {};
+    updateCalculator();
+  }
 
   function updateCalculator() {
     calculatorList.innerHTML = '';
