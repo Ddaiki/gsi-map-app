@@ -2,61 +2,141 @@
 <html lang="ja">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <title>航空写真 輪郭・面積検索</title>
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script src='https://unpkg.com/@turf/turf@6/turf.min.js'></script>
-
 <style>
+  * { box-sizing: border-box; }
   body { margin: 0; padding: 0; font-family: sans-serif; }
-  #map { height: 100vh; width: 100vw; cursor: grab; }
-  .ui-container { position: absolute; top: 10px; left: 10px; right: 10px; z-index: 1000; display: flex; justify-content: center; pointer-events: none; }
-  .search-box { background: white; padding: 10px; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.3); text-align: center; pointer-events: auto; }
-  #address-input { width: 250px; padding: 8px; border: 1px solid #ccc; border-radius: 4px; }
-  .button { padding: 8px 12px; border: none; background-color: #007bff; color: white; border-radius: 4px; cursor: pointer; margin-left: 5px; }
+  #map { height: 100dvh; width: 100vw; cursor: grab; }
+
+  .ui-container {
+    position: absolute; top: 10px; left: 10px; right: 10px;
+    z-index: 1000; display: flex; justify-content: center; pointer-events: none;
+  }
+  .search-box {
+    background: white; padding: 10px; border-radius: 8px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.3); text-align: center;
+    pointer-events: auto; width: 100%; max-width: 420px;
+  }
+  .search-row { display: flex; gap: 6px; }
+  #address-input {
+    flex: 1; padding: 10px; border: 1px solid #ccc; border-radius: 4px;
+    font-size: 16px; /* iPhoneでズームしないための16px */
+    min-width: 0;
+  }
+  .button {
+    padding: 10px 14px; border: none; background-color: #007bff;
+    color: white; border-radius: 4px; cursor: pointer;
+    font-size: 15px; white-space: nowrap; flex-shrink: 0;
+  }
+  .button:active { opacity: 0.8; }
   .button:hover { background-color: #0056b3; }
   .action-button { margin: 5px; }
-  #suggestions { margin-top: 10px; max-height: 180px; overflow-y: auto; text-align: left; }
-  .suggestion-item { padding: 8px; cursor: pointer; border-bottom: 1px solid #eee; }
+  #suggestions { margin-top: 8px; max-height: 180px; overflow-y: auto; text-align: left; }
+  .suggestion-item {
+    padding: 10px 8px; cursor: pointer; border-bottom: 1px solid #eee; font-size: 14px;
+  }
+  .suggestion-item:active { background-color: #e0e0e0; }
   .suggestion-item:hover { background-color: #f0f0f0; }
-  #crosshair { position: absolute; top: 50%; left: 50%; width: 40px; height: 40px; border: 3px solid white; border-radius: 50%; box-shadow: 0 0 8px black; transform: translate(-50%, -50%); pointer-events: none; display: none; z-index: 999; }
-  #crosshair::before, #crosshair::after { content: ''; position: absolute; background: white; box-shadow: 0 0 3px black; }
+  #action-buttons { margin-top: 8px; display: flex; flex-wrap: wrap; justify-content: center; }
+
+  /* 現在地ボタン */
+  #locate-button {
+    position: absolute; bottom: 100px; right: 10px;
+    z-index: 1000; width: 44px; height: 44px;
+    background: white; border: 2px solid rgba(0,0,0,0.2);
+    border-radius: 4px; cursor: pointer; font-size: 20px;
+    display: flex; align-items: center; justify-content: center;
+    box-shadow: 0 1px 5px rgba(0,0,0,0.3);
+  }
+  #locate-button:active { background: #f0f0f0; }
+
+  #crosshair {
+    position: absolute; top: 50%; left: 50%; width: 40px; height: 40px;
+    border: 3px solid white; border-radius: 50%; box-shadow: 0 0 8px black;
+    transform: translate(-50%, -50%); pointer-events: none; display: none; z-index: 999;
+  }
+  #crosshair::before, #crosshair::after {
+    content: ''; position: absolute; background: white; box-shadow: 0 0 3px black;
+  }
   #crosshair::before { top: 50%; left: 6px; right: 6px; height: 3px; margin-top: -1.5px; }
   #crosshair::after { left: 50%; top: 6px; bottom: 6px; width: 3px; margin-left: -1.5px; }
-  #info-box { position: absolute; bottom: 20px; left: 50%; transform: translateX(-50%); background: rgba(0,0,0,0.7); color: white; padding: 8px 15px; border-radius: 20px; z-index: 1000; display: none; }
-  #calculator-container { position: absolute; bottom: 10px; left: 10px; width: 240px; background: white; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.3); z-index: 1000; display: none; pointer-events: auto; }
-  #calculator-header { padding: 10px; background-color: #f7f7f7; border-bottom: 1px solid #eee; border-top-left-radius: 8px; border-top-right-radius: 8px; }
+
+  #info-box {
+    position: absolute; bottom: 20px; left: 50%; transform: translateX(-50%);
+    background: rgba(0,0,0,0.7); color: white; padding: 8px 15px;
+    border-radius: 20px; z-index: 1000; display: none;
+    font-size: 13px; white-space: nowrap; max-width: 90vw;
+    text-align: center; line-height: 1.5;
+  }
+
+  #calculator-container {
+    position: absolute; bottom: 10px; left: 10px; width: 240px;
+    background: white; border-radius: 8px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.3); z-index: 1000; display: none; pointer-events: auto;
+  }
+  #calculator-header {
+    padding: 10px; background-color: #f7f7f7; border-bottom: 1px solid #eee;
+    border-top-left-radius: 8px; border-top-right-radius: 8px;
+    display: flex; justify-content: space-between; align-items: center;
+  }
   #calculator-header h3 { margin: 0; font-size: 16px; }
-  #calculator-list { list-style-type: none; padding: 0; margin: 0; max-height: 150px; overflow-y: auto; }
-  #calculator-list li { padding: 8px 10px; border-bottom: 1px solid #eee; font-size: 14px; display: flex; justify-content: space-between; }
-  #calculator-footer { padding: 10px; background-color: #f0f0f0; font-weight: bold; }
-  #roof-calculator { padding: 10px; border-top: 2px solid #ddd; background-color: #f0f0f0; border-bottom-left-radius: 8px; border-bottom-right-radius: 8px;}
+  #calculator-list {
+    list-style-type: none; padding: 0; margin: 0; max-height: 150px; overflow-y: auto;
+  }
+  #calculator-list li {
+    padding: 8px 10px; border-bottom: 1px solid #eee; font-size: 14px;
+    display: flex; justify-content: space-between;
+  }
+  #calculator-footer { padding: 10px; background-color: #f0f0f0; font-weight: bold; font-size: 14px; }
+  #roof-calculator {
+    padding: 10px; border-top: 2px solid #ddd; background-color: #f0f0f0;
+    border-bottom-left-radius: 8px; border-bottom-right-radius: 8px;
+  }
   #roof-calculator div { margin-top: 8px; }
-  #roof-area-total { font-weight: bold; color: #007bff; }
+  #roof-area-total { font-weight: bold; color: #007bff; font-size: 14px; }
+  #copy-btn {
+    padding: 4px 10px; font-size: 12px; background: #555; color: white;
+    border: none; border-radius: 4px; cursor: pointer;
+  }
+  #copy-btn:active { background: #333; }
+
+  /* スマホ用：計算パネルを小さい画面でも使えるように */
+  @media (max-width: 400px) {
+    #calculator-container { width: calc(100vw - 20px); left: 10px; right: 10px; }
+  }
 </style>
 </head>
 <body>
 
 <div class="ui-container">
   <div class="search-box">
-    <div>
-      <input type="text" id="address-input" placeholder="住所を入力して検索">
+    <div class="search-row">
+      <input type="text" id="address-input" placeholder="住所を入力して検索" autocomplete="off">
       <button id="search-button" class="button">検索</button>
     </div>
     <div id="suggestions"></div>
-    <div id="action-buttons" style="margin-top: 10px;"></div>
+    <div id="action-buttons"></div>
   </div>
 </div>
 
+<!-- 現在地ボタン -->
+<button id="locate-button" title="現在地へ">📍</button>
+
 <div id="calculator-container">
-  <div id="calculator-header"><h3>面積計算</h3></div>
+  <div id="calculator-header">
+    <h3>面積計算</h3>
+    <button id="copy-btn">コピー</button>
+  </div>
   <ul id="calculator-list"></ul>
   <div id="calculator-footer">Footprint合計: 0 m²</div>
   <div id="roof-calculator">
     <div>
       <label for="slope-rate-select" style="font-size: 14px;">勾配伸び率:</label>
-      <select id="slope-rate-select" style="padding: 4px; border-radius: 4px;">
+      <select id="slope-rate-select" style="padding: 4px; border-radius: 4px; font-size: 14px;">
         <option value="1.000">1.000 (陸屋根)</option>
         <option value="1.001">1.001 (5分)</option>
         <option value="1.005">1.005 (1寸)</option>
@@ -106,12 +186,67 @@
   const footprintTotalFooter = document.getElementById('calculator-footer');
   const slopeRateSelect = document.getElementById('slope-rate-select');
   const roofAreaTotalDiv = document.getElementById('roof-area-total');
+  const locateButton = document.getElementById('locate-button');
+  const copyBtn = document.getElementById('copy-btn');
 
-  L.tileLayer('https://cyberjapandata.gsi.go.jp/xyz/seamlessphoto/{z}/{x}/{y}.jpg', { attribution: "<a href='https://maps.gsi.go.jp/development/ichiran.html'>地理院タイル</a>|© <a href='https://www.openstreetmap.org/copyright'>OSM</a> contributors", maxNativeZoom: 18, maxZoom: 21 }).addTo(map);
+  L.tileLayer('https://cyberjapandata.gsi.go.jp/xyz/seamlessphoto/{z}/{x}/{y}.jpg', {
+    attribution: "<a href='https://maps.gsi.go.jp/development/ichiran.html'>地理院タイル</a>|© <a href='https://www.openstreetmap.org/copyright'>OSM</a> contributors",
+    maxNativeZoom: 18, maxZoom: 21
+  }).addTo(map);
   L.control.zoom({ position: 'bottomright' }).addTo(map);
 
-  searchButton.addEventListener('click', handleSearch);
-  addressInput.addEventListener('keypress', e => e.key === 'Enter' && handleSearch());
+  // 現在地ボタン
+  locateButton.addEventListener('click', () => {
+    if (!navigator.geolocation) { alert('この端末はGPSに対応していません。'); return; }
+    locateButton.textContent = '⏳';
+    navigator.geolocation.getCurrentPosition(
+      pos => {
+        locateButton.textContent = '📍';
+        const { latitude, longitude } = pos.coords;
+        map.setView([latitude, longitude], 19);
+        setupAdjustmentMode(latitude, longitude, '現在地');
+      },
+      err => {
+        locateButton.textContent = '📍';
+        if (err.code === 1) alert('位置情報のアクセスが許可されていません。\niPhoneの場合：設定 → Safari → 位置情報 → 許可');
+        else alert('現在地を取得できませんでした。');
+      },
+      { enableHighAccuracy: true, timeout: 10000 }
+    );
+  });
+
+  // コピーボタン
+  copyBtn.addEventListener('click', () => {
+    const footprint = footprintTotalFooter.textContent;
+    const roof = roofAreaTotalDiv.textContent;
+    const slope = slopeRateSelect.options[slopeRateSelect.selectedIndex].text;
+    const text = `【屋根面積計算】\n${footprint}\n勾配: ${slope}\n${roof}`;
+    if (navigator.clipboard) {
+      navigator.clipboard.writeText(text).then(() => {
+        copyBtn.textContent = '✓ コピー済';
+        setTimeout(() => copyBtn.textContent = 'コピー', 2000);
+      });
+    } else {
+      // iOS Safari fallback
+      const ta = document.createElement('textarea');
+      ta.value = text;
+      document.body.appendChild(ta);
+      ta.select();
+      document.execCommand('copy');
+      document.body.removeChild(ta);
+      copyBtn.textContent = '✓ コピー済';
+      setTimeout(() => copyBtn.textContent = 'コピー', 2000);
+    }
+  });
+
+  // 検索時にキーボードを閉じる
+  searchButton.addEventListener('click', () => {
+    addressInput.blur();
+    handleSearch();
+  });
+  addressInput.addEventListener('keypress', e => {
+    if (e.key === 'Enter') { addressInput.blur(); handleSearch(); }
+  });
   slopeRateSelect.addEventListener('change', updateCalculator);
 
   async function fetchWithTimeout(resource, options = {}, timeout = 15000) {
@@ -138,10 +273,11 @@
       multiBtn.onclick = () => handlePolygonFetch(true);
       actionButtonsContainer.appendChild(multiBtn);
     } else if (mode === 'polygon_displayed') {
-      infoBox.textContent = '輪郭が違う場合は再調整できます。周辺検索時は輪郭クリックで面積計算できます。';
+      infoBox.textContent = '輪郭が違う場合は再調整できます。\n周辺検索時は輪郭クリックで面積計算できます。';
       infoBox.style.display = 'block';
       const retryBtn = document.createElement('button');
       retryBtn.className = 'button';
+      retryBtn.style.fontSize = '14px';
       retryBtn.textContent = '位置を再調整する';
       retryBtn.onclick = enterAdjustmentModeFromCurrentView;
       actionButtonsContainer.appendChild(retryBtn);
@@ -149,7 +285,6 @@
   }
 
   function clearActiveLayer() { if (activeLayer) map.removeLayer(activeLayer); activeLayer = null; }
-
   function enterAdjustmentModeFromCurrentView() { clearActiveLayer(); updateUI('adjust'); }
 
   function setupAdjustmentMode(lat, lng, title) {
@@ -184,7 +319,7 @@
         if (closestBuilding) {
           activeLayer = createPolygonLayer(closestBuilding, currentInfo.title);
           if (activeLayer) { activeLayer.addTo(map); map.fitBounds(activeLayer.getBounds(), { padding: [50, 50] }); }
-           else { throw new Error('有効な輪郭データが見つかりませんでした。'); }
+          else { throw new Error('有効な輪郭データが見つかりませんでした。'); }
         } else { throw new Error('最も近い建物が見つかりませんでした。'); }
       }
       updateUI('polygon_displayed');
@@ -193,13 +328,14 @@
       setupAdjustmentMode(center.lat, center.lng, currentInfo.title);
     }
   }
-  
+
   function createPolygonLayer(building, title = '') {
     const geom = building.geometry;
     if (!geom || geom.length < 3) return null;
     const polygonCoords = geom.map(node => [node.lon, node.lat]);
-    if (polygonCoords[0][0] !== polygonCoords[polygonCoords.length - 1][0] || polygonCoords[0][1] !== polygonCoords[polygonCoords.length - 1][1]) {
-        polygonCoords.push(polygonCoords[0]);
+    if (polygonCoords[0][0] !== polygonCoords[polygonCoords.length - 1][0] ||
+        polygonCoords[0][1] !== polygonCoords[polygonCoords.length - 1][1]) {
+      polygonCoords.push(polygonCoords[0]);
     }
     const turfPolygon = turf.polygon([polygonCoords]);
     const area = turf.area(turfPolygon);
@@ -225,10 +361,7 @@
     updateCalculator();
   }
 
-  function resetCalculator() {
-    selectedLayers = {};
-    updateCalculator();
-  }
+  function resetCalculator() { selectedLayers = {}; updateCalculator(); }
 
   function updateCalculator() {
     calculatorList.innerHTML = '';
@@ -253,12 +386,13 @@
       const geom = building.geometry;
       if (!geom || geom.length < 3) return;
       const polygonCoords = geom.map(node => [node.lon, node.lat]);
-      if (polygonCoords[0][0] !== polygonCoords[polygonCoords.length - 1][0] || polygonCoords[0][1] !== polygonCoords[polygonCoords.length - 1][1]) {
-          polygonCoords.push(polygonCoords[0]);
+      if (polygonCoords[0][0] !== polygonCoords[polygonCoords.length - 1][0] ||
+          polygonCoords[0][1] !== polygonCoords[polygonCoords.length - 1][1]) {
+        polygonCoords.push(polygonCoords[0]);
       }
       const turfPolygon = turf.polygon([polygonCoords]);
       const centroid = turf.centroid(turfPolygon);
-      const distance = turf.distance(centerPoint, centroid, {units: 'meters'});
+      const distance = turf.distance(centerPoint, centroid, { units: 'meters' });
       if (distance < minDistance) { minDistance = distance; closestBuilding = building; }
     });
     return closestBuilding;
@@ -269,7 +403,7 @@
     const overpassUrl = 'https://overpass-api.de/api/interpreter';
     const query = `[out:json][timeout:15];way(around:${radius},${lat},${lon})["building"];out geom;`;
     const response = await fetchWithTimeout(overpassUrl, { method: 'POST', body: query });
-    if (!response.ok) { throw new Error(`サーバー応答エラー: ${response.status}`); }
+    if (!response.ok) throw new Error(`サーバー応答エラー: ${response.status}`);
     const data = await response.json();
     return data.elements.filter(e => e.type === 'way' && e.geometry);
   }
@@ -277,6 +411,7 @@
   function displaySuggestions(results) {
     suggestionsContainer.innerHTML = '';
     const header = document.createElement('div');
+    header.style.padding = '4px 0';
     header.innerHTML = '<b>こちらの住所でしょうか？</b>';
     suggestionsContainer.appendChild(header);
     results.forEach(result => {
@@ -285,6 +420,7 @@
       item.textContent = result.properties.title;
       item.onclick = () => {
         const coords = result.geometry.coordinates;
+        addressInput.blur();
         setupAdjustmentMode(coords[1], coords[0], result.properties.title);
       };
       suggestionsContainer.appendChild(item);
@@ -311,6 +447,5 @@
     }
   }
 </script>
-
 </body>
 </html>
