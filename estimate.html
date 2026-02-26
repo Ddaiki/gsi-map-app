@@ -1,0 +1,370 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>屋根葺き替え概算見積もり</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'Hiragino Sans', 'Meiryo', sans-serif; background: #f5f5f5; color: #2c2c2c; }
+
+  /* 画面表示用 */
+  .page-header {
+    background: #2c2c2c; color: white; padding: 20px;
+    display: flex; align-items: center; gap: 16px; flex-wrap: wrap;
+  }
+  .page-header h1 { font-size: 1.2rem; flex: 1; }
+  .page-header a { color: #aaa; font-size: 0.85rem; text-decoration: none; }
+  .page-header a:hover { color: white; }
+
+  .container { max-width: 900px; margin: 24px auto; padding: 0 16px 60px; }
+
+  .card {
+    background: white; border-radius: 8px; padding: 20px;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.1); margin-bottom: 20px;
+  }
+  .card h2 { font-size: 1rem; margin-bottom: 14px; padding-bottom: 8px; border-bottom: 2px solid #2c2c2c; }
+
+  .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  @media (max-width: 480px) { .form-grid { grid-template-columns: 1fr; } }
+
+  .form-group { display: flex; flex-direction: column; gap: 4px; }
+  .form-group label { font-size: 0.85rem; color: #666; }
+  .form-group input, .form-group select, .form-group textarea {
+    padding: 8px 10px; border: 1px solid #ccc; border-radius: 4px;
+    font-size: 0.95rem; font-family: inherit;
+  }
+  .form-group input:focus, .form-group select:focus {
+    outline: none; border-color: #007bff;
+  }
+
+  /* 屋根種類タブ */
+  .roof-tabs { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 16px; }
+  .roof-tab {
+    padding: 6px 14px; border: 2px solid #ccc; border-radius: 20px;
+    background: white; cursor: pointer; font-size: 0.85rem; color: #666;
+    transition: all 0.15s;
+  }
+  .roof-tab.active { border-color: #007bff; background: #007bff; color: white; }
+
+  /* 単価設定テーブル */
+  .unit-table { width: 100%; border-collapse: collapse; font-size: 0.88rem; }
+  .unit-table th { background: #f0f0f0; padding: 8px 10px; text-align: left; font-weight: normal; color: #555; }
+  .unit-table td { padding: 6px 8px; border-bottom: 1px solid #eee; }
+  .unit-table input {
+    width: 100%; padding: 5px 8px; border: 1px solid #ddd; border-radius: 3px;
+    font-size: 0.88rem; text-align: right;
+  }
+  .unit-table input:focus { outline: none; border-color: #007bff; }
+
+  /* 共通費用 */
+  .common-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 12px; }
+
+  /* 結果表示 */
+  .result-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 14px; margin-bottom: 16px; }
+  .result-card {
+    border: 2px solid #e0e0e0; border-radius: 8px; overflow: hidden;
+  }
+  .result-card.highlight { border-color: #007bff; }
+  .result-card-header {
+    background: #f7f7f7; padding: 10px 14px; font-size: 0.9rem; font-weight: bold;
+  }
+  .result-card.highlight .result-card-header { background: #007bff; color: white; }
+  .result-card-body { padding: 10px 14px; }
+  .result-row { display: flex; justify-content: space-between; font-size: 0.85rem; padding: 3px 0; border-bottom: 1px solid #f0f0f0; }
+  .result-row:last-child { border-bottom: none; }
+  .result-total { display: flex; justify-content: space-between; font-size: 1rem; font-weight: bold; padding: 8px 14px; background: #f9f9f9; border-top: 2px solid #e0e0e0; }
+  .result-card.highlight .result-total { background: #e8f0fe; }
+
+  .btn { padding: 10px 20px; border: none; border-radius: 4px; cursor: pointer; font-size: 0.95rem; font-family: inherit; }
+  .btn-primary { background: #007bff; color: white; }
+  .btn-primary:hover { background: #0056b3; }
+  .btn-secondary { background: #555; color: white; }
+  .btn-secondary:hover { background: #333; }
+  .btn-print { background: #2c2c2c; color: white; }
+  .btn-print:hover { background: #444; }
+
+  .btn-row { display: flex; gap: 10px; flex-wrap: wrap; }
+
+  .note { font-size: 0.8rem; color: #999; margin-top: 8px; }
+
+  /* ===== 印刷用スタイル ===== */
+  @media print {
+    body { background: white; font-size: 11pt; }
+    .no-print { display: none !important; }
+    .page-header { background: #2c2c2c !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; padding: 12px 20px; }
+    .container { max-width: 100%; margin: 0; padding: 10px; }
+    .card { box-shadow: none; border: 1px solid #ddd; page-break-inside: avoid; }
+    .result-grid { grid-template-columns: repeat(4, 1fr); }
+    .result-card-header { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+    .result-card.highlight .result-card-header { background: #007bff !important; color: white !important; }
+    .result-card.highlight .result-total { background: #e8f0fe !important; }
+    .print-only { display: block !important; }
+  }
+  .print-only { display: none; }
+</style>
+</head>
+<body>
+
+<div class="page-header no-print">
+  <div>
+    <a href="javascript:history.back()">← 地図アプリに戻る</a>
+    <h1>🏠 屋根葺き替え概算見積もり</h1>
+  </div>
+</div>
+
+<div class="print-only" style="padding: 12px 20px; background: #2c2c2c; color: white;">
+  <h1 style="font-size: 1.1rem;">屋根葺き替え概算見積もり</h1>
+</div>
+
+<div class="container">
+
+  <!-- 基本情報 -->
+  <div class="card no-print">
+    <h2>📋 基本情報</h2>
+    <div class="form-grid">
+      <div class="form-group">
+        <label>物件名・住所</label>
+        <input type="text" id="property-name" placeholder="例：山田様邸">
+      </div>
+      <div class="form-group">
+        <label>屋根面積（m²）</label>
+        <input type="number" id="roof-area" placeholder="例：120" min="1">
+      </div>
+      <div class="form-group">
+        <label>作成日</label>
+        <input type="date" id="estimate-date">
+      </div>
+      <div class="form-group">
+        <label>担当者</label>
+        <input type="text" id="staff-name" placeholder="例：長谷川大樹">
+      </div>
+    </div>
+  </div>
+
+  <!-- 屋根種類の単価設定 -->
+  <div class="card no-print">
+    <h2>🔧 屋根種類・単価設定</h2>
+    <div class="roof-tabs" id="roof-tabs"></div>
+    <div id="unit-panels"></div>
+  </div>
+
+  <!-- 共通費用 -->
+  <div class="card no-print">
+    <h2>💰 共通費用</h2>
+    <div class="common-grid">
+      <div class="form-group">
+        <label>足場代（円）</label>
+        <input type="number" id="scaffold" value="150000" min="0">
+      </div>
+      <div class="form-group">
+        <label>廃材処分費（円）</label>
+        <input type="number" id="disposal" value="50000" min="0">
+      </div>
+      <div class="form-group">
+        <label>諸経費率（%）</label>
+        <input type="number" id="overhead" value="10" min="0" max="100" step="0.5">
+      </div>
+    </div>
+    <p class="note">※ 諸経費は（材料費＋施工費＋足場＋廃材）に対して加算されます</p>
+  </div>
+
+  <!-- 計算ボタン -->
+  <div class="btn-row no-print" style="margin-bottom: 20px;">
+    <button class="btn btn-primary" onclick="calculate()">📊 概算を計算する</button>
+  </div>
+
+  <!-- 結果 -->
+  <div id="result-section" style="display:none;">
+    <div class="card">
+      <h2 id="result-title">📄 概算見積もり比較</h2>
+
+      <!-- 印刷時のみ表示する基本情報 -->
+      <div class="print-only" style="margin-bottom: 16px; font-size: 0.9rem; display: flex; gap: 40px; flex-wrap: wrap;">
+        <div><strong>物件名：</strong><span id="print-property"></span></div>
+        <div><strong>屋根面積：</strong><span id="print-area"></span> m²</div>
+        <div><strong>作成日：</strong><span id="print-date"></span></div>
+        <div><strong>担当者：</strong><span id="print-staff"></span></div>
+      </div>
+
+      <div class="result-grid" id="result-grid"></div>
+
+      <p class="note">※ この金額はあくまで概算です。現地調査後に正式なお見積もりをご提案いたします。</p>
+    </div>
+
+    <div class="btn-row no-print">
+      <button class="btn btn-print" onclick="printEstimate()">🖨️ PDF・印刷する</button>
+      <button class="btn btn-secondary" onclick="calculate()">再計算</button>
+    </div>
+  </div>
+
+</div>
+
+<script>
+// ===== 屋根種類のデフォルト設定 =====
+const roofTypes = [
+  {
+    id: 'honbuki',
+    name: '和瓦（本葺き）',
+    materialUnit: 8000,   // 円/m²
+    laborUnit: 6000,      // 円/m²
+  },
+  {
+    id: 'sanbuki',
+    name: '和瓦（桟葺き）',
+    materialUnit: 6000,
+    laborUnit: 4500,
+  },
+  {
+    id: 'galtect',
+    name: 'ガルテクト',
+    materialUnit: 5500,
+    laborUnit: 3500,
+  },
+  {
+    id: 'tatebiraki',
+    name: '立平葺き',
+    materialUnit: 4500,
+    laborUnit: 3000,
+  },
+];
+
+// ===== タブとパネルを生成 =====
+function buildUI() {
+  const tabsEl = document.getElementById('roof-tabs');
+  const panelsEl = document.getElementById('unit-panels');
+
+  roofTypes.forEach((roof, i) => {
+    // タブ
+    const tab = document.createElement('div');
+    tab.className = 'roof-tab' + (i === 0 ? ' active' : '');
+    tab.textContent = roof.name;
+    tab.dataset.id = roof.id;
+    tab.onclick = () => switchTab(roof.id);
+    tabsEl.appendChild(tab);
+
+    // パネル
+    const panel = document.createElement('div');
+    panel.id = `panel-${roof.id}`;
+    panel.style.display = i === 0 ? 'block' : 'none';
+    panel.innerHTML = `
+      <table class="unit-table">
+        <thead>
+          <tr>
+            <th>項目</th>
+            <th>単価（円/m²）</th>
+            <th>備考</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>材料費</td>
+            <td><input type="number" id="mat-${roof.id}" value="${roof.materialUnit}" min="0"></td>
+            <td style="font-size:0.8rem; color:#999;">× 屋根面積</td>
+          </tr>
+          <tr>
+            <td>施工費（工賃）</td>
+            <td><input type="number" id="lab-${roof.id}" value="${roof.laborUnit}" min="0"></td>
+            <td style="font-size:0.8rem; color:#999;">× 屋根面積</td>
+          </tr>
+        </tbody>
+      </table>
+    `;
+    panelsEl.appendChild(panel);
+  });
+}
+
+function switchTab(id) {
+  document.querySelectorAll('.roof-tab').forEach(t => t.classList.remove('active'));
+  document.querySelector(`.roof-tab[data-id="${id}"]`).classList.add('active');
+  roofTypes.forEach(r => {
+    document.getElementById(`panel-${r.id}`).style.display = r.id === id ? 'block' : 'none';
+  });
+}
+
+// ===== 計算 =====
+function calculate() {
+  const area = parseFloat(document.getElementById('roof-area').value);
+  if (!area || area <= 0) { alert('屋根面積を入力してください。'); return; }
+
+  const scaffold = parseFloat(document.getElementById('scaffold').value) || 0;
+  const disposal = parseFloat(document.getElementById('disposal').value) || 0;
+  const overheadRate = parseFloat(document.getElementById('overhead').value) || 0;
+
+  // 印刷用基本情報
+  document.getElementById('print-property').textContent = document.getElementById('property-name').value || '—';
+  document.getElementById('print-area').textContent = area;
+  document.getElementById('print-date').textContent = document.getElementById('estimate-date').value || '—';
+  document.getElementById('print-staff').textContent = document.getElementById('staff-name').value || '—';
+
+  const grid = document.getElementById('result-grid');
+  grid.innerHTML = '';
+
+  // 最安値を探してハイライト
+  const totals = roofTypes.map(roof => {
+    const mat = (parseFloat(document.getElementById(`mat-${roof.id}`).value) || 0) * area;
+    const lab = (parseFloat(document.getElementById(`lab-${roof.id}`).value) || 0) * area;
+    const sub = mat + lab + scaffold + disposal;
+    const overhead = Math.round(sub * overheadRate / 100);
+    return Math.round(sub + overhead);
+  });
+  const minTotal = Math.min(...totals);
+
+  roofTypes.forEach((roof, i) => {
+    const mat = Math.round((parseFloat(document.getElementById(`mat-${roof.id}`).value) || 0) * area);
+    const lab = Math.round((parseFloat(document.getElementById(`lab-${roof.id}`).value) || 0) * area);
+    const sub = mat + lab + scaffold + disposal;
+    const overhead = Math.round(sub * overheadRate / 100);
+    const total = Math.round(sub + overhead);
+    const isMin = total === minTotal;
+
+    const card = document.createElement('div');
+    card.className = 'result-card' + (isMin ? ' highlight' : '');
+    card.innerHTML = `
+      <div class="result-card-header">
+        ${isMin ? '★ ' : ''}${roof.name}
+      </div>
+      <div class="result-card-body">
+        <div class="result-row"><span>材料費</span><span>${fmt(mat)}円</span></div>
+        <div class="result-row"><span>施工費</span><span>${fmt(lab)}円</span></div>
+        <div class="result-row"><span>足場代</span><span>${fmt(scaffold)}円</span></div>
+        <div class="result-row"><span>廃材処分費</span><span>${fmt(disposal)}円</span></div>
+        <div class="result-row"><span>諸経費(${overheadRate}%)</span><span>${fmt(overhead)}円</span></div>
+      </div>
+      <div class="result-total">
+        <span>合計（税抜）</span>
+        <span>${fmt(total)}円</span>
+      </div>
+    `;
+    grid.appendChild(card);
+  });
+
+  document.getElementById('result-section').style.display = 'block';
+  document.getElementById('result-section').scrollIntoView({ behavior: 'smooth' });
+}
+
+function fmt(n) {
+  return n.toLocaleString('ja-JP');
+}
+
+function printEstimate() {
+  window.print();
+}
+
+// ===== 初期化 =====
+buildUI();
+
+// 今日の日付をセット
+document.getElementById('estimate-date').value = new Date().toISOString().split('T')[0];
+
+// URLパラメータから屋根面積を受け取る（地図アプリから連携）
+const params = new URLSearchParams(window.location.search);
+if (params.get('area')) {
+  document.getElementById('roof-area').value = params.get('area');
+}
+if (params.get('address')) {
+  document.getElementById('property-name').value = decodeURIComponent(params.get('address'));
+}
+</script>
+</body>
+</html>
