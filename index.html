@@ -387,6 +387,19 @@
     const totalRoofArea = totalFootprintArea * slopeRate;
     footprintTotalFooter.textContent = `Footprint合計: ${totalFootprintArea} m²`;
     roofAreaTotalDiv.textContent = `屋根面積合計: ${Math.round(totalRoofArea)} m²`;
+   // 見積もりボタンの更新
+let estimateBtn = document.getElementById('estimate-link-btn');
+if (!estimateBtn) {
+  estimateBtn = document.createElement('a');
+  estimateBtn.id = 'estimate-link-btn';
+  estimateBtn.style.cssText = 'display:block; margin-top:10px; padding:8px; background:#e67e22; color:white; text-align:center; border-radius:4px; text-decoration:none; font-size:13px;';
+  estimateBtn.textContent = '🏠 見積もりを作成する';
+  document.getElementById('roof-calculator').appendChild(estimateBtn);
+}
+const area = Math.round(totalRoofArea);
+const addr = encodeURIComponent(currentInfo.title || '');
+estimateBtn.href = `estimate.html?area=${area}&address=${addr}`;
+
   }
 
   function findClosestBuilding(center, buildings) {
