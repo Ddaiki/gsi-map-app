@@ -103,7 +103,6 @@
   }
   .print-only { display: none; }
 </style>
- <!-- Google Analytics -->
 <script async src="https://www.googletagmanager.com/gtag/js?id=G-LWYHBZDC4L"></script>
 <script>
   window.dataLayer = window.dataLayer || [];
@@ -128,7 +127,6 @@
 
 <div class="container">
 
-  <!-- 基本情報 -->
   <div class="card no-print">
     <h2>📋 基本情報</h2>
     <div class="form-grid">
@@ -146,19 +144,17 @@
       </div>
       <div class="form-group">
         <label>担当者</label>
-        <input type="text" id="staff-name" placeholder="例：長谷川大樹">
+        <input type="text" id="staff-name" placeholder="例：長谷川大喜">
       </div>
     </div>
   </div>
 
-  <!-- 屋根種類の単価設定 -->
   <div class="card no-print">
     <h2>🔧 屋根種類・単価設定</h2>
     <div class="roof-tabs" id="roof-tabs"></div>
     <div id="unit-panels"></div>
   </div>
 
-  <!-- 共通費用 -->
   <div class="card no-print">
     <h2>💰 共通費用</h2>
     <div class="common-grid">
@@ -178,17 +174,14 @@
     <p class="note">※ 諸経費は（材料費＋施工費＋足場＋廃材）に対して加算されます</p>
   </div>
 
-  <!-- 計算ボタン -->
   <div class="btn-row no-print" style="margin-bottom: 20px;">
     <button class="btn btn-primary" onclick="calculate()">📊 概算を計算する</button>
   </div>
 
-  <!-- 結果 -->
   <div id="result-section" style="display:none;">
     <div class="card">
       <h2 id="result-title">📄 概算見積もり比較</h2>
 
-      <!-- 印刷時のみ表示する基本情報 -->
       <div class="print-only" style="margin-bottom: 16px; font-size: 0.9rem; display: flex; gap: 40px; flex-wrap: wrap;">
         <div><strong>物件名：</strong><span id="print-property"></span></div>
         <div><strong>屋根面積：</strong><span id="print-area"></span> m²</div>
@@ -210,41 +203,77 @@
 </div>
 
 <script>
-// ===== 屋根種類のデフォルト設定 =====
-const roofTypes = [
-  {
-    id: 'honbuki',
-    name: '和瓦（本葺き）',
-    materialUnit: 8000,   // 円/m²
-    laborUnit: 6000,      // 円/m²
-  },
-  {
-    id: 'sanbuki',
-    name: '和瓦（桟葺き）',
-    materialUnit: 6000,
-    laborUnit: 4500,
-  },
-  {
-    id: 'galtect',
-    name: 'ガルテクト',
-    materialUnit: 5500,
-    laborUnit: 3500,
-  },
-  {
-    id: 'tatebiraki',
-    name: '立平葺き',
-    materialUnit: 4500,
-    laborUnit: 3000,
-  },
+// ===== 屋根種類のデフォルト設定（通信失敗時の予備） =====
+let roofTypes = [
+  { id: 'honbuki', name: '和瓦（本葺き）', materialUnit: 8000, laborUnit: 6000 },
+  { id: 'sanbuki', name: '和瓦（桟葺き）', materialUnit: 6000, laborUnit: 4500 },
+  { id: 'tatebiraki', name: '立平葺き', materialUnit: 4500, laborUnit: 3000 },
 ];
+
+// ===== スプレッドシートからのデータ取得 =====
+const SHEET_ID = '1LrFR2RIGqhTt2oYd0N08CERxr5dlC9BxONt5_OFD6-Y';
+const url = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:json`;
+
+fetch(url)
+  .then(r => r.text())
+  .then(text => {
+    // Google Visualization APIの不要なプレフィックスを除去してJSON化
+    const json = JSON.parse(text.match(/google\.visualization\.Query\.setResponse\(([\s\S]*)\)/)[1]);
+    const rows = json.table.rows;
+
+    // スプレッドシートの値でデフォルト値を上書きする
+    try {
+      // 1行目（インデックス0）がヘッダーだとして、2行目（インデックス1）から読み取る
+      if (rows[1]) {
+        roofTypes[0].materialUnit = rows[1].c[3] ? rows[1].c[3].v : roofTypes[0].materialUnit;
+        roofTypes[0].laborUnit = rows[1].c[4] ? rows[1].c[4].v : roofTypes[0].laborUnit;
+      }
+      if (rows[2]) {
+        roofTypes[1].materialUnit = rows[2].c[3] ? rows[2].c[3].v : roofTypes[1].materialUnit;
+        roofTypes[1].laborUnit = rows[2].c[4] ? rows[2].c[4].v : roofTypes[1].laborUnit;
+      }
+      // ガルテクトの行（rows[3]）を読み飛ばし、立平葺きの行（rows[4]）をroofTypes[2]に割り当てる
+      if (rows[4]) {
+        roofTypes[2].materialUnit = rows[4].c[3] ? rows[4].c[3].v : roofTypes[2].materialUnit;
+        roofTypes[2].laborUnit = rows[4].c[4] ? rows[4].c[4].v : roofTypes[2].laborUnit;
+      }
+    } catch (e) {
+      console.warn("スプレッドシートのパースエラー。デフォルト値を使用します。");
+    }
+
+    // データの取得と反映が終わったらUIを描画
+    initApp();
+  })
+  .catch(error => {
+    console.error("スプレッドシート通信エラー:", error);
+    initApp(); // エラー時もデフォルト値で起動
+  });
+
+// ===== 初期化処理 =====
+function initApp() {
+  buildUI();
+  
+  // 今日の日付をセット
+  document.getElementById('estimate-date').value = new Date().toISOString().split('T')[0];
+
+  // URLパラメータの受け取り（地図アプリから）
+  const params = new URLSearchParams(window.location.search);
+  if (params.get('area')) {
+    document.getElementById('roof-area').value = params.get('area');
+  }
+  if (params.get('address')) {
+    document.getElementById('property-name').value = decodeURIComponent(params.get('address'));
+  }
+}
 
 // ===== タブとパネルを生成 =====
 function buildUI() {
   const tabsEl = document.getElementById('roof-tabs');
   const panelsEl = document.getElementById('unit-panels');
+  tabsEl.innerHTML = '';
+  panelsEl.innerHTML = '';
 
   roofTypes.forEach((roof, i) => {
-    // タブ
     const tab = document.createElement('div');
     tab.className = 'roof-tab' + (i === 0 ? ' active' : '');
     tab.textContent = roof.name;
@@ -252,7 +281,6 @@ function buildUI() {
     tab.onclick = () => switchTab(roof.id);
     tabsEl.appendChild(tab);
 
-    // パネル
     const panel = document.createElement('div');
     panel.id = `panel-${roof.id}`;
     panel.style.display = i === 0 ? 'block' : 'none';
@@ -309,7 +337,6 @@ function calculate() {
   const grid = document.getElementById('result-grid');
   grid.innerHTML = '';
 
-  // 最安値を探してハイライト
   const totals = roofTypes.map(roof => {
     const mat = (parseFloat(document.getElementById(`mat-${roof.id}`).value) || 0) * area;
     const lab = (parseFloat(document.getElementById(`lab-${roof.id}`).value) || 0) * area;
@@ -358,21 +385,6 @@ function fmt(n) {
 
 function printEstimate() {
   window.print();
-}
-
-// ===== 初期化 =====
-buildUI();
-
-// 今日の日付をセット
-document.getElementById('estimate-date').value = new Date().toISOString().split('T')[0];
-
-// URLパラメータから屋根面積を受け取る（地図アプリから連携）
-const params = new URLSearchParams(window.location.search);
-if (params.get('area')) {
-  document.getElementById('roof-area').value = params.get('area');
-}
-if (params.get('address')) {
-  document.getElementById('property-name').value = decodeURIComponent(params.get('address'));
 }
 </script>
 </body>
