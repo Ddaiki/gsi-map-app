@@ -1,0 +1,43 @@
+name: たばこ小売定価 自動更新
+
+on:
+  schedule:
+    # 毎週月曜日 9:00 JST (0:00 UTC) に実行
+    - cron: '0 0 * * 1'
+  workflow_dispatch:
+    # 手動実行も可能
+
+permissions:
+  contents: write
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: 'pip'
+          cache-dependency-path: tobacco-prices/scripts/requirements.txt
+
+      - name: Install dependencies
+        run: pip install -r tobacco-prices/scripts/requirements.txt
+
+      - name: Run updater
+        run: python tobacco-prices/scripts/update_prices.py
+
+      - name: Commit if changed
+        run: |
+          git config user.name  "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add tobacco-prices/data/prices.json
+          if git diff --cached --quiet; then
+            echo "No changes to commit"
+          else
+            git commit -m "chore: たばこ小売定価データ更新 $(date +'%Y-%m-%d')"
+            git push
+          fi
