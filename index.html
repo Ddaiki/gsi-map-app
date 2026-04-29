@@ -42,7 +42,6 @@
   .suggestion-item:hover { background-color: #f0f0f0; }
   #action-buttons { margin-top: 8px; display: flex; flex-wrap: wrap; justify-content: center; }
 
-  /* info-boxを検索ボックス直下に表示 */
   #info-box {
     margin-top: 8px;
     background: rgba(0,0,0,0.7); color: white; padding: 7px 12px;
@@ -72,6 +71,20 @@
   #crosshair::before { top: 50%; left: 6px; right: 6px; height: 3px; margin-top: -1.5px; }
   #crosshair::after { left: 50%; top: 6px; bottom: 6px; width: 3px; margin-left: -1.5px; }
 
+  /* ローディングオーバーレイ */
+  #loading-overlay {
+    position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+    background: rgba(0,0,0,0.35); z-index: 2000;
+    display: none; align-items: center; justify-content: center;
+  }
+  .spinner {
+    width: 48px; height: 48px;
+    border: 5px solid rgba(255,255,255,0.35);
+    border-top-color: white; border-radius: 50%;
+    animation: spin 0.75s linear infinite;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
   #calculator-container {
     position: absolute; bottom: 10px; left: 10px; width: 240px;
     background: white; border-radius: 8px;
@@ -95,8 +108,23 @@
     padding: 10px; border-top: 2px solid #ddd; background-color: #f0f0f0;
     border-bottom-left-radius: 8px; border-bottom-right-radius: 8px;
   }
-  #roof-calculator div { margin-top: 8px; }
+  #roof-calculator > div { margin-top: 8px; }
   #roof-area-total { font-weight: bold; color: #007bff; font-size: 14px; }
+
+  /* 手動入力セクション */
+  #manual-area-section {
+    border-top: 1px solid #ccc; padding-top: 8px; margin-top: 4px !important; display: none;
+  }
+  #manual-area-section label { font-size: 12px; color: #666; display: block; margin-bottom: 4px; }
+  #manual-area-row { display: flex; gap: 4px; margin-top: 0 !important; }
+  #manual-area-input {
+    flex: 1; padding: 5px; border: 1px solid #ccc; border-radius: 4px; font-size: 13px;
+  }
+  #manual-apply-btn {
+    padding: 5px 8px; background: #27ae60; color: white; border: none;
+    border-radius: 4px; cursor: pointer; font-size: 12px; white-space: nowrap;
+  }
+  #manual-apply-btn:active { opacity: 0.8; }
 
   .small-btn {
     padding: 4px 8px; font-size: 12px; border: none;
@@ -105,12 +133,13 @@
   .small-btn:active { opacity: 0.7; }
   #copy-btn { background: #555; }
   #reset-btn { background: #e74c3c; }
+  #toggle-btn { background: #888; }
 
   @media (max-width: 400px) {
     #calculator-container { width: calc(100vw - 20px); left: 10px; right: 10px; }
   }
 </style>
- <!-- Google Analytics -->
+<!-- Google Analytics -->
 <script async src="https://www.googletagmanager.com/gtag/js?id=G-LWYHBZDC4L"></script>
 <script>
   window.dataLayer = window.dataLayer || [];
@@ -118,7 +147,6 @@
   gtag('js', new Date());
   gtag('config', 'G-LWYHBZDC4L');
 </script>
-
 </head>
 <body>
 
@@ -130,51 +158,62 @@
     </div>
     <div id="suggestions"></div>
     <div id="action-buttons"></div>
-    <!-- info-boxを検索ボックス内の一番下に配置 -->
     <div id="info-box"></div>
   </div>
 </div>
 
 <button id="locate-button" title="現在地へ">📍</button>
 
+<div id="loading-overlay"><div class="spinner"></div></div>
+
 <div id="calculator-container">
   <div id="calculator-header">
     <h3>面積計算</h3>
+    <button id="toggle-btn" class="small-btn" title="折りたたむ">▼</button>
     <button id="reset-btn" class="small-btn">リセット</button>
     <button id="copy-btn" class="small-btn">コピー</button>
   </div>
-  <ul id="calculator-list"></ul>
-  <div id="calculator-footer">Footprint合計: 0 m²</div>
-  <div id="roof-calculator">
-    <div>
-      <label for="slope-rate-select" style="font-size: 14px;">勾配伸び率:</label>
-      <select id="slope-rate-select" style="padding: 4px; border-radius: 4px; font-size: 14px;">
-        <option value="1.000">1.000 (陸屋根)</option>
-        <option value="1.001">1.001 (5分)</option>
-        <option value="1.005">1.005 (1寸)</option>
-        <option value="1.011">1.011 (1寸5分)</option>
-        <option value="1.020">1.020 (2寸)</option>
-        <option value="1.031">1.031 (2寸5分)</option>
-        <option value="1.044">1.044 (3寸)</option>
-        <option value="1.050">1.050 (3寸5分)</option>
-        <option value="1.077" selected>1.077 (4寸)</option>
-        <option value="1.097">1.097 (4寸5分)</option>
-        <option value="1.118">1.118 (5寸)</option>
-        <option value="1.141">1.141 (5寸5分)</option>
-        <option value="1.166">1.166 (6寸)</option>
-        <option value="1.193">1.193 (6寸5分)</option>
-        <option value="1.221">1.221 (7寸)</option>
-        <option value="1.250">1.250 (7寸5分)</option>
-        <option value="1.281">1.281 (8寸)</option>
-        <option value="1.312">1.312 (8寸5分)</option>
-        <option value="1.345">1.345 (9寸)</option>
-        <option value="1.379">1.379 (9寸5分)</option>
-        <option value="1.414">1.414 (矩勾配)</option>
-        <option value="1.487">1.487 (9寸返し)</option>
-        <option value="1.562">1.562 (8寸返し)</option>
-      </select>
+  <div id="calculator-body">
+    <ul id="calculator-list"></ul>
+    <div id="calculator-footer">建物面積合計: 0 m²</div>
+    <div id="roof-calculator">
+      <div>
+        <label for="slope-rate-select" style="font-size: 14px;">勾配伸び率:</label>
+        <select id="slope-rate-select" style="padding: 4px; border-radius: 4px; font-size: 14px;">
+          <option value="1.000">1.000 (陸屋根)</option>
+          <option value="1.001">1.001 (5分)</option>
+          <option value="1.005">1.005 (1寸)</option>
+          <option value="1.011">1.011 (1寸5分)</option>
+          <option value="1.020">1.020 (2寸)</option>
+          <option value="1.031">1.031 (2寸5分)</option>
+          <option value="1.044">1.044 (3寸)</option>
+          <option value="1.050">1.050 (3寸5分)</option>
+          <option value="1.077" selected>1.077 (4寸)</option>
+          <option value="1.097">1.097 (4寸5分)</option>
+          <option value="1.118">1.118 (5寸)</option>
+          <option value="1.141">1.141 (5寸5分)</option>
+          <option value="1.166">1.166 (6寸)</option>
+          <option value="1.193">1.193 (6寸5分)</option>
+          <option value="1.221">1.221 (7寸)</option>
+          <option value="1.250">1.250 (7寸5分)</option>
+          <option value="1.281">1.281 (8寸)</option>
+          <option value="1.312">1.312 (8寸5分)</option>
+          <option value="1.345">1.345 (9寸)</option>
+          <option value="1.379">1.379 (9寸5分)</option>
+          <option value="1.414">1.414 (矩勾配)</option>
+          <option value="1.487">1.487 (9寸返し)</option>
+          <option value="1.562">1.562 (8寸返し)</option>
+        </select>
+      </div>
+      <div id="roof-area-total">屋根面積合計: 0 m²</div>
+      <div id="manual-area-section">
+        <label>輪郭未取得時 — 手動で面積を入力</label>
+        <div id="manual-area-row">
+          <input type="number" id="manual-area-input" placeholder="面積 m²" min="1">
+          <button id="manual-apply-btn" onclick="applyManualArea()">適用</button>
+        </div>
+      </div>
     </div>
-    <div id="roof-area-total">屋根面積合計: 0 m²</div>
   </div>
 </div>
 
@@ -184,6 +223,12 @@
 <script>
   let activeLayer, currentInfo = { lat: 0, lng: 0, title: '' };
   let selectedLayers = {};
+  let calculatorBodyVisible = true;
+
+  const OVERPASS_URLS = [
+    'https://overpass-api.de/api/interpreter',
+    'https://overpass.kumi.systems/api/interpreter'
+  ];
 
   const map = L.map('map', { zoomControl: false }).setView([35.681, 139.767], 15);
   const addressInput = document.getElementById('address-input');
@@ -193,6 +238,7 @@
   const crosshair = document.getElementById('crosshair');
   const infoBox = document.getElementById('info-box');
   const calculatorContainer = document.getElementById('calculator-container');
+  const calculatorBody = document.getElementById('calculator-body');
   const calculatorList = document.getElementById('calculator-list');
   const footprintTotalFooter = document.getElementById('calculator-footer');
   const slopeRateSelect = document.getElementById('slope-rate-select');
@@ -200,12 +246,25 @@
   const locateButton = document.getElementById('locate-button');
   const copyBtn = document.getElementById('copy-btn');
   const resetBtn = document.getElementById('reset-btn');
+  const toggleBtn = document.getElementById('toggle-btn');
+  const loadingOverlay = document.getElementById('loading-overlay');
 
   L.tileLayer('https://cyberjapandata.gsi.go.jp/xyz/seamlessphoto/{z}/{x}/{y}.jpg', {
     attribution: "<a href='https://maps.gsi.go.jp/development/ichiran.html'>地理院タイル</a>|© <a href='https://www.openstreetmap.org/copyright'>OSM</a> contributors",
     maxNativeZoom: 18, maxZoom: 21
   }).addTo(map);
   L.control.zoom({ position: 'bottomright' }).addTo(map);
+
+  function showLoading() { loadingOverlay.style.display = 'flex'; }
+  function hideLoading() { loadingOverlay.style.display = 'none'; }
+
+  // 折りたたみトグル
+  toggleBtn.addEventListener('click', () => {
+    calculatorBodyVisible = !calculatorBodyVisible;
+    calculatorBody.style.display = calculatorBodyVisible ? 'block' : 'none';
+    toggleBtn.textContent = calculatorBodyVisible ? '▼' : '▲';
+    toggleBtn.title = calculatorBodyVisible ? '折りたたむ' : '展開する';
+  });
 
   // 現在地ボタン
   locateButton.addEventListener('click', () => {
@@ -252,7 +311,6 @@
 
   // リセットボタン
   resetBtn.addEventListener('click', () => {
-    // 選択中の輪郭の色を元に戻す
     if (activeLayer) {
       activeLayer.eachLayer(layer => {
         if (layer.setStyle) layer.setStyle({ color: '#3388ff' });
@@ -265,7 +323,7 @@
   addressInput.addEventListener('keypress', e => { if (e.key === 'Enter') { addressInput.blur(); handleSearch(); } });
   slopeRateSelect.addEventListener('change', updateCalculator);
 
-  async function fetchWithTimeout(resource, options = {}, timeout = 15000) {
+  async function fetchWithTimeout(resource, options = {}, timeout = 12000) {
     const controller = new AbortController();
     const id = setTimeout(() => controller.abort(), timeout);
     const response = await fetch(resource, { ...options, signal: controller.signal });
@@ -297,6 +355,20 @@
       retryBtn.textContent = '位置を再調整する';
       retryBtn.onclick = enterAdjustmentModeFromCurrentView;
       actionButtonsContainer.appendChild(retryBtn);
+    } else if (mode === 'fetch_failed') {
+      crosshair.style.display = 'block';
+      infoBox.style.display = 'block';
+      const retryBtn = document.createElement('button');
+      retryBtn.className = 'button action-button';
+      retryBtn.textContent = '周辺50mの輪郭を取得';
+      retryBtn.onclick = () => handlePolygonFetch(true);
+      const manualBtn = document.createElement('button');
+      manualBtn.className = 'button action-button';
+      manualBtn.style.backgroundColor = '#27ae60';
+      manualBtn.textContent = '面積を手動入力';
+      manualBtn.onclick = showManualInput;
+      actionButtonsContainer.appendChild(retryBtn);
+      actionButtonsContainer.appendChild(manualBtn);
     }
   }
 
@@ -311,12 +383,36 @@
     updateUI('adjust');
   }
 
+  function showManualInput() {
+    crosshair.style.display = 'none';
+    actionButtonsContainer.innerHTML = '';
+    infoBox.style.display = 'none';
+    calculatorContainer.style.display = 'block';
+    document.getElementById('manual-area-section').style.display = 'block';
+    if (!calculatorBodyVisible) {
+      calculatorBodyVisible = true;
+      calculatorBody.style.display = 'block';
+      toggleBtn.textContent = '▼';
+      toggleBtn.title = '折りたたむ';
+    }
+  }
+
+  function applyManualArea() {
+    const input = document.getElementById('manual-area-input');
+    const area = parseFloat(input.value);
+    if (!area || area <= 0) { alert('有効な面積を入力してください。'); return; }
+    selectedLayers['manual'] = { area: Math.round(area), id: 'manual' };
+    updateCalculator();
+  }
+
   async function handlePolygonFetch(fetchAll = false) {
     const center = map.getCenter();
     currentInfo.lat = center.lat; currentInfo.lng = center.lng;
-    updateUI('fetching');
+    crosshair.style.display = 'none';
+    actionButtonsContainer.innerHTML = '';
     infoBox.textContent = '輪郭データを検索中...';
     infoBox.style.display = 'block';
+    showLoading();
     try {
       const buildings = await fetchBuildingPolygons(center.lat, center.lng);
       clearActiveLayer();
@@ -340,8 +436,12 @@
       }
       updateUI('polygon_displayed');
     } catch (error) {
-      alert(error.name === 'AbortError' ? '検索がタイムアウトしました。' : error.message);
-      setupAdjustmentMode(center.lat, center.lng, currentInfo.title);
+      const msg = error.name === 'AbortError' ? '検索がタイムアウトしました。' : error.message;
+      updateUI('fetch_failed');
+      infoBox.textContent = msg;
+      infoBox.style.display = 'block';
+    } finally {
+      hideLoading();
     }
   }
 
@@ -379,36 +479,43 @@
 
   function resetCalculator() {
     selectedLayers = {};
+    document.getElementById('manual-area-section').style.display = 'none';
+    const manualInput = document.getElementById('manual-area-input');
+    if (manualInput) manualInput.value = '';
     updateCalculator();
   }
 
   function updateCalculator() {
     calculatorList.innerHTML = '';
     let totalFootprintArea = 0;
+    let counter = 1;
     for (const id in selectedLayers) {
       const props = selectedLayers[id];
       const li = document.createElement('li');
-      li.innerHTML = `<span>ID ${id}</span><span>${props.area} m²</span>`;
+      const label = id === 'manual' ? '手動入力' : `建物${counter++}`;
+      li.innerHTML = `<span>${label}</span><span>${props.area} m²</span>`;
       calculatorList.appendChild(li);
       totalFootprintArea += props.area;
     }
     const slopeRate = parseFloat(slopeRateSelect.value);
     const totalRoofArea = totalFootprintArea * slopeRate;
-    footprintTotalFooter.textContent = `Footprint合計: ${totalFootprintArea} m²`;
+    footprintTotalFooter.textContent = `建物面積合計: ${totalFootprintArea} m²`;
     roofAreaTotalDiv.textContent = `屋根面積合計: ${Math.round(totalRoofArea)} m²`;
-   // 見積もりボタンの更新
-let estimateBtn = document.getElementById('estimate-link-btn');
-if (!estimateBtn) {
-  estimateBtn = document.createElement('a');
-  estimateBtn.id = 'estimate-link-btn';
-  estimateBtn.style.cssText = 'display:block; margin-top:10px; padding:8px; background:#e67e22; color:white; text-align:center; border-radius:4px; text-decoration:none; font-size:13px;';
-  estimateBtn.textContent = '🏠 見積もりを作成する';
-  document.getElementById('roof-calculator').appendChild(estimateBtn);
-}
-const area = Math.round(totalRoofArea);
-const addr = encodeURIComponent(currentInfo.title || '');
-estimateBtn.href = `estimate.html?area=${area}&address=${addr}`;
 
+    // 見積もりボタン
+    let estimateBtn = document.getElementById('estimate-link-btn');
+    if (!estimateBtn) {
+      estimateBtn = document.createElement('a');
+      estimateBtn.id = 'estimate-link-btn';
+      estimateBtn.style.cssText = 'display:block; margin-top:10px; padding:8px; background:#e67e22; color:white; text-align:center; border-radius:4px; text-decoration:none; font-size:13px; transition:opacity 0.2s;';
+      estimateBtn.textContent = '🏠 見積もりを作成する';
+      document.getElementById('roof-calculator').appendChild(estimateBtn);
+    }
+    const area = Math.round(totalRoofArea);
+    const addr = encodeURIComponent(currentInfo.title || '');
+    estimateBtn.href = area > 0 ? `estimate.html?area=${area}&address=${addr}` : '#';
+    estimateBtn.style.opacity = area > 0 ? '1' : '0.4';
+    estimateBtn.style.pointerEvents = area > 0 ? 'auto' : 'none';
   }
 
   function findClosestBuilding(center, buildings) {
@@ -432,12 +539,19 @@ estimateBtn.href = `estimate.html?area=${area}&address=${addr}`;
 
   async function fetchBuildingPolygons(lat, lon) {
     const radius = 50;
-    const overpassUrl = 'https://overpass-api.de/api/interpreter';
     const query = `[out:json][timeout:15];way(around:${radius},${lat},${lon})["building"];out geom;`;
-    const response = await fetchWithTimeout(overpassUrl, { method: 'POST', body: query });
-    if (!response.ok) throw new Error(`サーバー応答エラー: ${response.status}`);
-    const data = await response.json();
-    return data.elements.filter(e => e.type === 'way' && e.geometry);
+    let lastError;
+    for (const url of OVERPASS_URLS) {
+      try {
+        const response = await fetchWithTimeout(url, { method: 'POST', body: query }, 12000);
+        if (!response.ok) { lastError = new Error(`サーバー応答エラー: ${response.status}`); continue; }
+        const data = await response.json();
+        return data.elements.filter(e => e.type === 'way' && e.geometry);
+      } catch (e) {
+        lastError = e;
+      }
+    }
+    throw lastError || new Error('輪郭データの取得に失敗しました。');
   }
 
   function displaySuggestions(results) {

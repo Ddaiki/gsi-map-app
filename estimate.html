@@ -73,7 +73,16 @@
   .result-card-body { padding: 10px 14px; }
   .result-row { display: flex; justify-content: space-between; font-size: 0.85rem; padding: 3px 0; border-bottom: 1px solid #f0f0f0; }
   .result-row:last-child { border-bottom: none; }
-  .result-total { display: flex; justify-content: space-between; font-size: 1rem; font-weight: bold; padding: 8px 14px; background: #f9f9f9; border-top: 2px solid #e0e0e0; }
+  .result-row.tax-row { color: #888; }
+  .result-subtotal {
+    display: flex; justify-content: space-between; font-size: 0.88rem;
+    padding: 6px 14px; background: #fafafa; border-top: 1px solid #e0e0e0; color: #555;
+  }
+  .result-total {
+    display: flex; justify-content: space-between; font-size: 1rem; font-weight: bold;
+    padding: 8px 14px; background: #f9f9f9; border-top: 2px solid #e0e0e0;
+  }
+  .result-card.highlight .result-subtotal { background: #f0f5ff; }
   .result-card.highlight .result-total { background: #e8f0fe; }
 
   .btn { padding: 10px 20px; border: none; border-radius: 4px; cursor: pointer; font-size: 0.95rem; font-family: inherit; }
@@ -95,7 +104,7 @@
     .page-header { background: #2c2c2c !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; padding: 12px 20px; }
     .container { max-width: 100%; margin: 0; padding: 10px; }
     .card { box-shadow: none; border: 1px solid #ddd; page-break-inside: avoid; }
-    .result-grid { grid-template-columns: repeat(4, 1fr); }
+    .result-grid { grid-template-columns: repeat(3, 1fr); }
     .result-card-header { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
     .result-card.highlight .result-card-header { background: #007bff !important; color: white !important; }
     .result-card.highlight .result-total { background: #e8f0fe !important; }
@@ -110,13 +119,12 @@
   gtag('js', new Date());
   gtag('config', 'G-LWYHBZDC4L');
 </script>
-
 </head>
 <body>
 
 <div class="page-header no-print">
   <div>
-    <a href="javascript:history.back()">← 地図アプリに戻る</a>
+    <a href="index.html">← 地図アプリに戻る</a>
     <h1>🏠 屋根葺き替え概算見積もり</h1>
   </div>
 </div>
@@ -217,13 +225,12 @@ const url = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:
 fetch(url)
   .then(r => r.text())
   .then(text => {
-    // Google Visualization APIの不要なプレフィックスを除去してJSON化
-    const json = JSON.parse(text.match(/google\.visualization\.Query\.setResponse\(([\s\S]*)\)/)[1]);
+    const match = text.match(/google\.visualization\.Query\.setResponse\(([\s\S]*)\)/);
+    if (!match) throw new Error('Google Sheetsのレスポンス形式が予期しない形式です');
+    const json = JSON.parse(match[1]);
     const rows = json.table.rows;
 
-    // スプレッドシートの値でデフォルト値を上書きする
     try {
-      // 1行目（インデックス0）がヘッダーだとして、2行目（インデックス1）から読み取る
       if (rows[1]) {
         roofTypes[0].materialUnit = rows[1].c[3] ? rows[1].c[3].v : roofTypes[0].materialUnit;
         roofTypes[0].laborUnit = rows[1].c[4] ? rows[1].c[4].v : roofTypes[0].laborUnit;
@@ -232,31 +239,27 @@ fetch(url)
         roofTypes[1].materialUnit = rows[2].c[3] ? rows[2].c[3].v : roofTypes[1].materialUnit;
         roofTypes[1].laborUnit = rows[2].c[4] ? rows[2].c[4].v : roofTypes[1].laborUnit;
       }
-      // ガルテクトの行（rows[3]）を読み飛ばし、立平葺きの行（rows[4]）をroofTypes[2]に割り当てる
       if (rows[4]) {
         roofTypes[2].materialUnit = rows[4].c[3] ? rows[4].c[3].v : roofTypes[2].materialUnit;
         roofTypes[2].laborUnit = rows[4].c[4] ? rows[4].c[4].v : roofTypes[2].laborUnit;
       }
     } catch (e) {
-      console.warn("スプレッドシートのパースエラー。デフォルト値を使用します。");
+      console.warn('スプレッドシートのパースエラー。デフォルト値を使用します。', e);
     }
 
-    // データの取得と反映が終わったらUIを描画
     initApp();
   })
   .catch(error => {
-    console.error("スプレッドシート通信エラー:", error);
-    initApp(); // エラー時もデフォルト値で起動
+    console.error('スプレッドシート通信エラー:', error);
+    initApp();
   });
 
 // ===== 初期化処理 =====
 function initApp() {
   buildUI();
-  
-  // 今日の日付をセット
+
   document.getElementById('estimate-date').value = new Date().toISOString().split('T')[0];
 
-  // URLパラメータの受け取り（地図アプリから）
   const params = new URLSearchParams(window.location.search);
   if (params.get('area')) {
     document.getElementById('roof-area').value = params.get('area');
@@ -327,8 +330,8 @@ function calculate() {
   const scaffold = parseFloat(document.getElementById('scaffold').value) || 0;
   const disposal = parseFloat(document.getElementById('disposal').value) || 0;
   const overheadRate = parseFloat(document.getElementById('overhead').value) || 0;
+  const taxRate = 0.10;
 
-  // 印刷用基本情報
   document.getElementById('print-property').textContent = document.getElementById('property-name').value || '—';
   document.getElementById('print-area').textContent = area;
   document.getElementById('print-date').textContent = document.getElementById('estimate-date').value || '—';
@@ -337,14 +340,15 @@ function calculate() {
   const grid = document.getElementById('result-grid');
   grid.innerHTML = '';
 
-  const totals = roofTypes.map(roof => {
+  const totalsWithTax = roofTypes.map(roof => {
     const mat = (parseFloat(document.getElementById(`mat-${roof.id}`).value) || 0) * area;
     const lab = (parseFloat(document.getElementById(`lab-${roof.id}`).value) || 0) * area;
     const sub = mat + lab + scaffold + disposal;
     const overhead = Math.round(sub * overheadRate / 100);
-    return Math.round(sub + overhead);
+    const total = Math.round(sub + overhead);
+    return total + Math.round(total * taxRate);
   });
-  const minTotal = Math.min(...totals);
+  const minTotalWithTax = Math.min(...totalsWithTax);
 
   roofTypes.forEach((roof, i) => {
     const mat = Math.round((parseFloat(document.getElementById(`mat-${roof.id}`).value) || 0) * area);
@@ -352,7 +356,9 @@ function calculate() {
     const sub = mat + lab + scaffold + disposal;
     const overhead = Math.round(sub * overheadRate / 100);
     const total = Math.round(sub + overhead);
-    const isMin = total === minTotal;
+    const tax = Math.round(total * taxRate);
+    const totalWithTax = total + tax;
+    const isMin = totalWithTax === minTotalWithTax;
 
     const card = document.createElement('div');
     card.className = 'result-card' + (isMin ? ' highlight' : '');
@@ -367,9 +373,16 @@ function calculate() {
         <div class="result-row"><span>廃材処分費</span><span>${fmt(disposal)}円</span></div>
         <div class="result-row"><span>諸経費(${overheadRate}%)</span><span>${fmt(overhead)}円</span></div>
       </div>
-      <div class="result-total">
-        <span>合計（税抜）</span>
+      <div class="result-subtotal">
+        <span>小計（税抜）</span>
         <span>${fmt(total)}円</span>
+      </div>
+      <div class="result-card-body">
+        <div class="result-row tax-row"><span>消費税（10%）</span><span>${fmt(tax)}円</span></div>
+      </div>
+      <div class="result-total">
+        <span>合計（税込）</span>
+        <span>${fmt(totalWithTax)}円</span>
       </div>
     `;
     grid.appendChild(card);
